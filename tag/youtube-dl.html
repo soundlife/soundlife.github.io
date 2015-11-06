@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+        <meta charset="utf-8" />
+        <title>SoundLife开发日志 - youtube-dl</title>
+        <link rel="stylesheet" href="http://soundlife.github.io/theme/css/main.css" />
+        <link href="http://soundlife.github.io/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="SoundLife开发日志 Atom Feed" />
+
+        <!--[if IE]>
+            <script src="https://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+        <![endif]-->
+</head>
+
+<body id="index" class="home">
+        <header id="banner" class="body">
+                <h1><a href="http://soundlife.github.io/">SoundLife开发日志 </a></h1>
+                <nav><ul>
+                    <li><a href="http://soundlife.github.io/category/misc.html">misc</a></li>
+                </ul></nav>
+        </header><!-- /#banner -->
+
+            <aside id="featured" class="body">
+                <article>
+                    <h1 class="entry-title"><a href="http://soundlife.github.io/2015/09/concat-flv-into-one-streaming-mp4.html">把多个flv合并成一个streaming MP4</a></h1>
+<footer class="post-info">
+        <abbr class="published" title="2015-09-25T00:00:00+08:00">
+                Published: Fri 25 September 2015
+        </abbr>
+
+        <address class="vcard author">
+                By                         <a class="url fn" href="http://soundlife.github.io/author/rex.html">rex</a>
+        </address>
+<p>In <a href="http://soundlife.github.io/category/misc.html">misc</a>.</p>
+<p>tags: <a href="http://soundlife.github.io/tag/ffmpeg.html">ffmpeg</a> <a href="http://soundlife.github.io/tag/youtube-dl.html">youtube-dl</a> <a href="http://soundlife.github.io/tag/mp4.html">mp4</a> <a href="http://soundlife.github.io/tag/flv.html">flv</a> </p>
+</footer><!-- /.post-info --><p>要测试视频播放的功能，需要很多mp4文件。我们可以用youtube-dl从流行的视频网站比如优酷下载到很多视频。</p>
+<p>可是优酷的视频却是以分段的flv为主的。因此还需要用ffmpeg把这些flv合并成一个MP4。合并的方法鄂可以参考ffmpeg Wiki里的<a class="reference external" href="https://trac.ffmpeg.org/wiki/Concatenate">Concatenate</a>条目。</p>
+<p>而一个streaming MP4，是以一个duration为0的moov box开头，后面就是一个moof，一个mdat，不断重复直到结束。可以用以下参数来转换。</p>
+<pre class="code literal-block">
+-movflags frag_keyframe+empty_moov+default_base_moof
+</pre>
+<p>把以上代码合并成一个脚本</p>
+<pre class="code literal-block">
+#!/usr/bin/env bash
+
+URL=&quot;$1&quot;
+FILELIST=$(youtube-dl -F &quot;${URL}&quot; | grep formats | grep -Po '[^ ]+(?=:)')
+FILENAME=$(youtube-dl -e &quot;${URL}&quot; | head -n 1)
+youtube-dl -f flv -o '%(id)s.%(ext)s' &quot;${URL}&quot;
+ffmpeg -f concat -i &lt;(for f in ${FILELIST}; do echo &quot;file '${PWD}/$f.flv'&quot;; done) -c copy -movflags frag_keyframe+empty_moov+default_base_moof &quot;${FILENAME}.mp4&quot;
+</pre>
+                </article>
+            </aside><!-- /#featured -->
+        <section id="extras" class="body">
+                <div class="social">
+                        <h2>social</h2>
+                        <ul>
+                            <li><a href="http://soundlife.github.io/feeds/all.atom.xml" type="application/atom+xml" rel="alternate">atom feed</a></li>
+
+                        </ul>
+                </div><!-- /.social -->
+        </section><!-- /#extras -->
+
+        <footer id="contentinfo" class="body">
+                <address id="about" class="vcard body">
+                Proudly powered by <a href="http://getpelican.com/">Pelican</a>, which takes great advantage of <a href="http://python.org">Python</a>.
+                </address><!-- /#about -->
+
+                <p>The theme is by <a href="http://coding.smashingmagazine.com/2009/08/04/designing-a-html-5-layout-from-scratch/">Smashing Magazine</a>, thanks!</p>
+        </footer><!-- /#contentinfo -->
+
+</body>
+</html>

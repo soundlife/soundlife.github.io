@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+        <meta charset="utf-8" />
+        <title>合并多层Docker Image</title>
+        <link rel="stylesheet" href="http://soundlife.github.io/theme/css/main.css" />
+        <link href="http://soundlife.github.io/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="SoundLife开发日志 Atom Feed" />
+
+        <!--[if IE]>
+            <script src="https://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+        <![endif]-->
+</head>
+
+<body id="index" class="home">
+        <header id="banner" class="body">
+                <h1><a href="http://soundlife.github.io/">SoundLife开发日志 </a></h1>
+                <nav><ul>
+                    <li class="active"><a href="http://soundlife.github.io/category/misc.html">misc</a></li>
+                </ul></nav>
+        </header><!-- /#banner -->
+<section id="content" class="body">
+  <article>
+    <header>
+      <h1 class="entry-title">
+        <a href="http://soundlife.github.io/2015/09/flatten-docker-images.html" rel="bookmark"
+           title="Permalink to 合并多层Docker Image">合并多层Docker Image</a></h1>
+    </header>
+
+    <div class="entry-content">
+<footer class="post-info">
+        <abbr class="published" title="2015-09-04T00:00:00+08:00">
+                Published: Fri 04 September 2015
+        </abbr>
+
+        <address class="vcard author">
+                By                         <a class="url fn" href="http://soundlife.github.io/author/rex.html">rex</a>
+        </address>
+<p>In <a href="http://soundlife.github.io/category/misc.html">misc</a>.</p>
+<p>tags: <a href="http://soundlife.github.io/tag/docker.html">docker</a> </p>
+</footer><!-- /.post-info -->      <p>用docker build生成出来的Docker Image会有很多层。Docker并不提供工具直接合并。而网上有很多人建议通过导出container来合并。可是这样，虽然所有文件都合并到一层了，Image的元信息都丢了。</p>
+<p>根据<a class="reference external" href="https://github.com/docker/docker/blob/master/image/spec/v1.md">Docker Image Specification</a>，我们可以自己来补充这些信息</p>
+<p>首先导出 container</p>
+<pre class="code literal-block">
+docker export --output=&quot;layer.tar&quot; &quot;${CONTAINER_ID}&quot;
+</pre>
+<p>按照Spec，Image的ID是用随机数的，在这里用hash也不是什么问题。</p>
+<pre class="code literal-block">
+FLATTENED_IMAGE_ID=&quot;$(sha256sum layer.tar | grep -Eo '^[a-f0-9]+')&quot;
+</pre>
+<p>接着建立Spec所要求的文件，把元信息从原始Image里复制过来</p>
+<pre class="code literal-block">
+cat &gt; repositories &lt;&lt; EOF
+{&quot;${PROJECT_NAME}&quot;: {&quot;${IMAGE_VERSION}&quot;: &quot;${FLATTENED_IMAGE_ID}&quot;}}
+EOF
+
+mkdir ${FLATTENED_IMAGE_ID}
+mv layer.tar ${FLATTENED_IMAGE_ID}/
+
+
+cat &gt; ${FLATTENED_IMAGE_ID}/VERSION &lt;&lt; EOF
+1.0
+EOF
+
+cat &gt; ${FLATTENED_IMAGE_ID}/json &lt;&lt; EOF
+{&quot;Id&quot;: &quot;${FLATTENED_IMAGE_ID}&quot;,
+&quot;Created&quot;: $(docker inspect --format &quot;{{json .Created}}&quot; ${ORIGIN_IMAGE_ID}),
+&quot;Config&quot;: $(docker inspect --format &quot;{{json .Config}}&quot; ${ORIGIN_IMAGE_ID}),
+&quot;Architecture&quot;: $(docker inspect --format &quot;{{json .Architecture}}&quot; ${ORIGIN_IMAGE_ID}),
+&quot;Os&quot;: $(docker inspect --format &quot;{{json .Os}}&quot; ${ORIGIN_IMAGE_ID}),
+&quot;DockerVersion&quot;: $(docker inspect --format &quot;{{json .DockerVersion}}&quot; ${ORIGIN_IMAGE_ID}),
+&quot;Size&quot;: $(stat --format '%s' ${FLATTENED_IMAGE_ID}/layer.tar)
+}
+EOF
+</pre>
+<p>把这些文件合并成tarball，并导入docker</p>
+<pre class="code literal-block">
+tar cvf &quot;../${TARBALL}&quot; *
+cd ..
+
+docker load --input &quot;${TARBALL}&quot;
+</pre>
+<p>这样，Image就只剩下一层了。</p>
+
+    </div><!-- /.entry-content -->
+
+  </article>
+</section>
+        <section id="extras" class="body">
+                <div class="social">
+                        <h2>social</h2>
+                        <ul>
+                            <li><a href="http://soundlife.github.io/feeds/all.atom.xml" type="application/atom+xml" rel="alternate">atom feed</a></li>
+
+                        </ul>
+                </div><!-- /.social -->
+        </section><!-- /#extras -->
+
+        <footer id="contentinfo" class="body">
+                <address id="about" class="vcard body">
+                Proudly powered by <a href="http://getpelican.com/">Pelican</a>, which takes great advantage of <a href="http://python.org">Python</a>.
+                </address><!-- /#about -->
+
+                <p>The theme is by <a href="http://coding.smashingmagazine.com/2009/08/04/designing-a-html-5-layout-from-scratch/">Smashing Magazine</a>, thanks!</p>
+        </footer><!-- /#contentinfo -->
+
+</body>
+</html>

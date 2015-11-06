@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom"><title>SoundLife开发日志</title><link href="http://soundlife.github.io/" rel="alternate"></link><link href="http://soundlife.github.io/feeds/misc.atom.xml" rel="self"></link><id>http://soundlife.github.io/</id><updated>2015-09-25T00:00:00+08:00</updated><entry><title>把多个flv合并成一个streaming MP4</title><link href="http://soundlife.github.io/2015/09/concat-flv-into-one-streaming-mp4.html" rel="alternate"></link><published>2015-09-25T00:00:00+08:00</published><author><name>rex</name></author><id>tag:soundlife.github.io,2015-09-25:2015/09/concat-flv-into-one-streaming-mp4.html</id><summary type="html">&lt;p&gt;要测试视频播放的功能，需要很多mp4文件。我们可以用youtube-dl从流行的视频网站比如优酷下载到很多视频。&lt;/p&gt;
+&lt;p&gt;可是优酷的视频却是以分段的flv为主的。因此还需要用ffmpeg把这些flv合并成一个MP4。合并的方法鄂可以参考ffmpeg Wiki里的&lt;a class="reference external" href="https://trac.ffmpeg.org/wiki/Concatenate"&gt;Concatenate&lt;/a&gt;条目。&lt;/p&gt;
+&lt;p&gt;而一个streaming MP4，是以一个duration为0的moov box开头，后面就是一个moof，一个mdat，不断重复直到结束。可以用以下参数来转换。&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+-movflags frag_keyframe+empty_moov+default_base_moof
+&lt;/pre&gt;
+&lt;p&gt;把以上代码合并成一个脚本&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+#!/usr/bin/env bash
+
+URL=&amp;quot;$1&amp;quot;
+FILELIST=$(youtube-dl -F &amp;quot;${URL}&amp;quot; | grep formats | grep -Po '[^ ]+(?=:)')
+FILENAME=$(youtube-dl -e &amp;quot;${URL}&amp;quot; | head -n 1)
+youtube-dl -f flv -o '%(id)s.%(ext)s' &amp;quot;${URL}&amp;quot;
+ffmpeg -f concat -i &amp;lt;(for f in ${FILELIST}; do echo &amp;quot;file '${PWD}/$f.flv'&amp;quot;; done) -c copy -movflags frag_keyframe+empty_moov+default_base_moof &amp;quot;${FILENAME}.mp4&amp;quot;
+&lt;/pre&gt;
+</summary><category term="ffmpeg"></category><category term="youtube-dl"></category><category term="mp4"></category><category term="flv"></category></entry><entry><title>AWS S3和阿里云 OSS API的区别</title><link href="http://soundlife.github.io/2015/09/difference-between-aws-s3-and-aliyun-oss-api.html" rel="alternate"></link><published>2015-09-18T00:00:00+08:00</published><author><name>rex</name></author><id>tag:soundlife.github.io,2015-09-18:2015/09/difference-between-aws-s3-and-aliyun-oss-api.html</id><summary type="html">&lt;p&gt;阿里云OSS除了功能比AWS S3少不少以外，API大致上和AWS S3是一样的，只是有一些微小的差别。&lt;/p&gt;
+&lt;p&gt;AWS S3上Authorization Header是以AWS开头的，阿里云OSS是用OSS开头的。一些特殊的header，AWS S3是以x-amz开头的，阿里云OSS是用x-oss开头的。&lt;/p&gt;
+&lt;p&gt;计算canonical string时，Resource，AWS S3是直接取原始字符串的，阿里云OSS是取解析后的，比如&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+PUT /%E5%A5%BD
+&lt;/pre&gt;
+&lt;p&gt;AWS S3里最后一行要用&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+/bucket-name/%E5%A5%BD
+&lt;/pre&gt;
+&lt;p&gt;阿里云OSS里最后一行要用&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+/bucket-name/好
+&lt;/pre&gt;
+&lt;p&gt;在Copy Object时，x-oss-copy-source必须以/开头，比如&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+x-oss-copy-source: /bucket-name/object-name
+&lt;/pre&gt;
+&lt;p&gt;不知道为啥AWS S3可以不用，至少boto没有以/开头。&lt;/p&gt;
+&lt;p&gt;另外一个特殊的地方是，假如你发的Header里x-oss-date不为空，而Date为空，计算canonical string时，两者都应该取x-oss-date的值。这个在用浏览器上传文件时比较重要，因为XMLHttpRequest不能设置Date Header。&lt;/p&gt;
+</summary><category term="s3"></category><category term="oss"></category></entry><entry><title>前端工具配置</title><link href="http://soundlife.github.io/2015/09/frontend-tools-configuration.html" rel="alternate"></link><published>2015-09-11T00:00:00+08:00</published><author><name>rex</name></author><id>tag:soundlife.github.io,2015-09-11:2015/09/frontend-tools-configuration.html</id><summary type="html">&lt;p&gt;NPM在国内下载速度比较慢，可以使用淘宝的NPM镜像。配置npmrc。registry那行是为NPM设置的镜像，disturl是为node-gyp设置的镜像。&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+registry=https://registry.npm.taobao.org
+disturl=http://npm.taobao.org/mirrors/node
+&lt;/pre&gt;
+&lt;p&gt;因为npm, bower分别依赖当前目录下的node_modules, bower_components。而有一些包里会一些原生程序，而原生程序不能同时在Mac OS X和boot2docker里运行。在运行CI时，前后端所有步骤都会一次在Docker里运行。为了让所有人都能在自己机器上重现CI上的结果，在boot2docker里运行时，我们把这两个目录设置到了 /usr/local/lib/node 下。不幸的是，这些工具很多都假设这两个目录是在当前目录下，并没有直接配置的方法。&lt;/p&gt;
+&lt;p&gt;把package.json复制到/usr/local/lib/node/package.json，运行npm时，加上prefix参数&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+npm install --prefix=/usr/local/lib/node
+&lt;/pre&gt;
+&lt;p&gt;设置PATH, NODE_PATH环境变量&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+export PATH=/usr/local/lib/node/node_modules/.bin:$PATH
+export NODE_PATH=/usr/local/lib/node/node_modules
+&lt;/pre&gt;
+&lt;p&gt;这样一配置，webpack就不工作了。&lt;/p&gt;
+&lt;p&gt;webpack的配置里有这么一行&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+module: {loaders: [{ loader: 'babel-loader' }]}
+&lt;/pre&gt;
+&lt;p&gt;在配置好 node_modules 目录后需要改成&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+module: {loaders: [{ loader: require.resolve('babel-loader') }]}
+&lt;/pre&gt;
+&lt;p&gt;接下来修改 bower_components 的路径。先把.bowerrc修改成下面这样&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+{
+  &amp;quot;analytics&amp;quot;: false,
+  &amp;quot;interactive&amp;quot;: false,
+  &amp;quot;cwd&amp;quot;: &amp;quot;/usr/local/lib/node&amp;quot;
+}
+&lt;/pre&gt;
+&lt;p&gt;把bower.json复制到/usr/local/lib/node/bower.json&lt;/p&gt;
+&lt;p&gt;在gulpfile.js里，先增加一行&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+var bower = require('bower');
+&lt;/pre&gt;
+&lt;p&gt;接着把所有&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+gulp.src(mainBowerFiles({}))
+&lt;/pre&gt;
+&lt;p&gt;改成&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+gulp.src(mainBowerFiles({paths: bower.config.cwd}))
+&lt;/pre&gt;
+&lt;p&gt;最后来配置SASS。在Docker里，SASS安装不起来，需要加一个环境变量&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+export SKIP_SASS_BINARY_DOWNLOAD_FOR_CI=true
+&lt;/pre&gt;
+&lt;p&gt;SASS找不到bower_components里的文件，需要在gulpfile.js作类似如下配置&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+.pipe(sass({includePaths: [path.resolve(bower.config.cwd, bower.config.directory)]}))
+&lt;/pre&gt;
+</summary><category term="docker"></category><category term="npm"></category><category term="gulp"></category><category term="bower"></category><category term="webpack"></category><category term="sass"></category></entry><entry><title>合并多层Docker Image</title><link href="http://soundlife.github.io/2015/09/flatten-docker-images.html" rel="alternate"></link><published>2015-09-04T00:00:00+08:00</published><author><name>rex</name></author><id>tag:soundlife.github.io,2015-09-04:2015/09/flatten-docker-images.html</id><summary type="html">&lt;p&gt;用docker build生成出来的Docker Image会有很多层。Docker并不提供工具直接合并。而网上有很多人建议通过导出container来合并。可是这样，虽然所有文件都合并到一层了，Image的元信息都丢了。&lt;/p&gt;
+&lt;p&gt;根据&lt;a class="reference external" href="https://github.com/docker/docker/blob/master/image/spec/v1.md"&gt;Docker Image Specification&lt;/a&gt;，我们可以自己来补充这些信息&lt;/p&gt;
+&lt;p&gt;首先导出 container&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+docker export --output=&amp;quot;layer.tar&amp;quot; &amp;quot;${CONTAINER_ID}&amp;quot;
+&lt;/pre&gt;
+&lt;p&gt;按照Spec，Image的ID是用随机数的，在这里用hash也不是什么问题。&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+FLATTENED_IMAGE_ID=&amp;quot;$(sha256sum layer.tar | grep -Eo '^[a-f0-9]+')&amp;quot;
+&lt;/pre&gt;
+&lt;p&gt;接着建立Spec所要求的文件，把元信息从原始Image里复制过来&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+cat &amp;gt; repositories &amp;lt;&amp;lt; EOF
+{&amp;quot;${PROJECT_NAME}&amp;quot;: {&amp;quot;${IMAGE_VERSION}&amp;quot;: &amp;quot;${FLATTENED_IMAGE_ID}&amp;quot;}}
+EOF
+
+mkdir ${FLATTENED_IMAGE_ID}
+mv layer.tar ${FLATTENED_IMAGE_ID}/
+
+
+cat &amp;gt; ${FLATTENED_IMAGE_ID}/VERSION &amp;lt;&amp;lt; EOF
+1.0
+EOF
+
+cat &amp;gt; ${FLATTENED_IMAGE_ID}/json &amp;lt;&amp;lt; EOF
+{&amp;quot;Id&amp;quot;: &amp;quot;${FLATTENED_IMAGE_ID}&amp;quot;,
+&amp;quot;Created&amp;quot;: $(docker inspect --format &amp;quot;{{json .Created}}&amp;quot; ${ORIGIN_IMAGE_ID}),
+&amp;quot;Config&amp;quot;: $(docker inspect --format &amp;quot;{{json .Config}}&amp;quot; ${ORIGIN_IMAGE_ID}),
+&amp;quot;Architecture&amp;quot;: $(docker inspect --format &amp;quot;{{json .Architecture}}&amp;quot; ${ORIGIN_IMAGE_ID}),
+&amp;quot;Os&amp;quot;: $(docker inspect --format &amp;quot;{{json .Os}}&amp;quot; ${ORIGIN_IMAGE_ID}),
+&amp;quot;DockerVersion&amp;quot;: $(docker inspect --format &amp;quot;{{json .DockerVersion}}&amp;quot; ${ORIGIN_IMAGE_ID}),
+&amp;quot;Size&amp;quot;: $(stat --format '%s' ${FLATTENED_IMAGE_ID}/layer.tar)
+}
+EOF
+&lt;/pre&gt;
+&lt;p&gt;把这些文件合并成tarball，并导入docker&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+tar cvf &amp;quot;../${TARBALL}&amp;quot; *
+cd ..
+
+docker load --input &amp;quot;${TARBALL}&amp;quot;
+&lt;/pre&gt;
+&lt;p&gt;这样，Image就只剩下一层了。&lt;/p&gt;
+</summary><category term="docker"></category></entry><entry><title>使用Docker Compose构建开发环境</title><link href="http://soundlife.github.io/2015/08/build-development-environment-with-docker-compose.html" rel="alternate"></link><published>2015-08-21T00:00:00+08:00</published><author><name>rex</name></author><id>tag:soundlife.github.io,2015-08-21:2015/08/build-development-environment-with-docker-compose.html</id><summary type="html">&lt;p&gt;一个网站可能会依赖Postgres，Memcache，Redis等等很多程序。依赖的东西多了，要把开发环境配置好，还是很花时间的。用&lt;a class="reference external" href="http://docs.docker.com/compose/"&gt;Docker Compose&lt;/a&gt;就可以很方便的利用现成的Docker Image来启动这些程序。&lt;/p&gt;
+&lt;p&gt;你需要一个像下面这样的docker-compose.yml&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+web:
+  build: .
+  ports:
+   - &amp;quot;8000:8000&amp;quot;
+  volumes:
+   - &amp;quot;${PWD}:/srv/my-project&amp;quot;
+  environment:
+    USER:
+  command: bro start web server at 8000
+  links:
+   - postgres
+   - memcache
+   - redis
+
+postgres:
+  image: postgres
+
+memcache:
+  image: memcache
+
+redis:
+  image: redis
+&lt;/pre&gt;
+&lt;p&gt;volumes用来把当前目录mount到container里。即使是在Mac OS X上用boot2docker，这也是可以工作的，因为boot2docker会把/Users目录映射到虚拟机里。&lt;/p&gt;
+&lt;p&gt;environment假如value是空的，那么会把运行docker-compose命令所在的环境变量设置成container里的环境变量。&lt;/p&gt;
+&lt;p&gt;ports用来把container里面的端口映射到container外面。假如你用的是Mac OS X上的boot2docker，需要自行去VirtualBox里设置端口转发。&lt;/p&gt;
+&lt;p&gt;这些都设置好了之后，运行&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+docker-compose up -d
+&lt;/pre&gt;
+&lt;p&gt;这一切就都运行起来了，你可以用&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+docker-compose logs
+&lt;/pre&gt;
+&lt;p&gt;观察日志&lt;/p&gt;
+&lt;p&gt;假如你把container都搞砸了，也没有问题。运行下面这两行代码，再从头开始就好了&lt;/p&gt;
+&lt;pre class="code literal-block"&gt;
+docker-compose kill
+docker-compose rm -f
+&lt;/pre&gt;
+&lt;p&gt;为了加快Image下载速度，可以把registry-mirror设置成https://docker.mirrors.ustc.edu.cn&lt;/p&gt;
+</summary><category term="docker"></category></entry></feed>

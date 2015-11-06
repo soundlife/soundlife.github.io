@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+        <meta charset="utf-8" />
+        <title>SoundLife开发日志 - npm</title>
+        <link rel="stylesheet" href="http://soundlife.github.io/theme/css/main.css" />
+        <link href="http://soundlife.github.io/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="SoundLife开发日志 Atom Feed" />
+
+        <!--[if IE]>
+            <script src="https://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+        <![endif]-->
+</head>
+
+<body id="index" class="home">
+        <header id="banner" class="body">
+                <h1><a href="http://soundlife.github.io/">SoundLife开发日志 </a></h1>
+                <nav><ul>
+                    <li><a href="http://soundlife.github.io/category/misc.html">misc</a></li>
+                </ul></nav>
+        </header><!-- /#banner -->
+
+            <aside id="featured" class="body">
+                <article>
+                    <h1 class="entry-title"><a href="http://soundlife.github.io/2015/09/frontend-tools-configuration.html">前端工具配置</a></h1>
+<footer class="post-info">
+        <abbr class="published" title="2015-09-11T00:00:00+08:00">
+                Published: Fri 11 September 2015
+        </abbr>
+
+        <address class="vcard author">
+                By                         <a class="url fn" href="http://soundlife.github.io/author/rex.html">rex</a>
+        </address>
+<p>In <a href="http://soundlife.github.io/category/misc.html">misc</a>.</p>
+<p>tags: <a href="http://soundlife.github.io/tag/docker.html">docker</a> <a href="http://soundlife.github.io/tag/npm.html">npm</a> <a href="http://soundlife.github.io/tag/gulp.html">gulp</a> <a href="http://soundlife.github.io/tag/bower.html">bower</a> <a href="http://soundlife.github.io/tag/webpack.html">webpack</a> <a href="http://soundlife.github.io/tag/sass.html">sass</a> </p>
+</footer><!-- /.post-info --><p>NPM在国内下载速度比较慢，可以使用淘宝的NPM镜像。配置npmrc。registry那行是为NPM设置的镜像，disturl是为node-gyp设置的镜像。</p>
+<pre class="code literal-block">
+registry=https://registry.npm.taobao.org
+disturl=http://npm.taobao.org/mirrors/node
+</pre>
+<p>因为npm, bower分别依赖当前目录下的node_modules, bower_components。而有一些包里会一些原生程序，而原生程序不能同时在Mac OS X和boot2docker里运行。在运行CI时，前后端所有步骤都会一次在Docker里运行。为了让所有人都能在自己机器上重现CI上的结果，在boot2docker里运行时，我们把这两个目录设置到了 /usr/local/lib/node 下。不幸的是，这些工具很多都假设这两个目录是在当前目录下，并没有直接配置的方法。</p>
+<p>把package.json复制到/usr/local/lib/node/package.json，运行npm时，加上prefix参数</p>
+<pre class="code literal-block">
+npm install --prefix=/usr/local/lib/node
+</pre>
+<p>设置PATH, NODE_PATH环境变量</p>
+<pre class="code literal-block">
+export PATH=/usr/local/lib/node/node_modules/.bin:$PATH
+export NODE_PATH=/usr/local/lib/node/node_modules
+</pre>
+<p>这样一配置，webpack就不工作了。</p>
+<p>webpack的配置里有这么一行</p>
+<pre class="code literal-block">
+module: {loaders: [{ loader: 'babel-loader' }]}
+</pre>
+<p>在配置好 node_modules 目录后需要改成</p>
+<pre class="code literal-block">
+module: {loaders: [{ loader: require.resolve('babel-loader') }]}
+</pre>
+<p>接下来修改 bower_components 的路径。先把.bowerrc修改成下面这样</p>
+<pre class="code literal-block">
+{
+  &quot;analytics&quot;: false,
+  &quot;interactive&quot;: false,
+  &quot;cwd&quot;: &quot;/usr/local/lib/node&quot;
+}
+</pre>
+<p>把bower.json复制到/usr/local/lib/node/bower.json</p>
+<p>在gulpfile.js里，先增加一行</p>
+<pre class="code literal-block">
+var bower = require('bower');
+</pre>
+<p>接着把所有</p>
+<pre class="code literal-block">
+gulp.src(mainBowerFiles({}))
+</pre>
+<p>改成</p>
+<pre class="code literal-block">
+gulp.src(mainBowerFiles({paths: bower.config.cwd}))
+</pre>
+<p>最后来配置SASS。在Docker里，SASS安装不起来，需要加一个环境变量</p>
+<pre class="code literal-block">
+export SKIP_SASS_BINARY_DOWNLOAD_FOR_CI=true
+</pre>
+<p>SASS找不到bower_components里的文件，需要在gulpfile.js作类似如下配置</p>
+<pre class="code literal-block">
+.pipe(sass({includePaths: [path.resolve(bower.config.cwd, bower.config.directory)]}))
+</pre>
+                </article>
+            </aside><!-- /#featured -->
+        <section id="extras" class="body">
+                <div class="social">
+                        <h2>social</h2>
+                        <ul>
+                            <li><a href="http://soundlife.github.io/feeds/all.atom.xml" type="application/atom+xml" rel="alternate">atom feed</a></li>
+
+                        </ul>
+                </div><!-- /.social -->
+        </section><!-- /#extras -->
+
+        <footer id="contentinfo" class="body">
+                <address id="about" class="vcard body">
+                Proudly powered by <a href="http://getpelican.com/">Pelican</a>, which takes great advantage of <a href="http://python.org">Python</a>.
+                </address><!-- /#about -->
+
+                <p>The theme is by <a href="http://coding.smashingmagazine.com/2009/08/04/designing-a-html-5-layout-from-scratch/">Smashing Magazine</a>, thanks!</p>
+        </footer><!-- /#contentinfo -->
+
+</body>
+</html>
